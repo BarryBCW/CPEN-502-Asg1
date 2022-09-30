@@ -1,141 +1,103 @@
 package XOR;
 
-import java.text.*;
+
 import java.util.*;
 import java.io.*;
 import java.lang.Math;
-public class NeuralNetwork {
+public class NeuralNetwork{
     static {
         Locale.setDefault(Locale.ENGLISH);
     }
     
-    final DecimalFormat df;
+    
     final Random rand = new Random();
-    final ArrayList<Neuron> inputLayer = new ArrayList<Neuron>();
-    final ArrayList<Neuron> hiddenLayer = new ArrayList<Neuron>();
-    final ArrayList<Neuron> outputLayer = new ArrayList<Neuron>();
-    final Neuron bias = new Neuron();
-    final int[] layers;
- 
+    
     final double epsilon = 0.00000000001;
  
-    final double learningRate = 0.2;
-    final double momentum = 0.0f;
+    double learningRate = 0.2;
+    double momentum = 0.0;
  
     // Inputs for xor problem
     //final double inputs[][] = { { 1, 1 }, { 1, 0 }, { 0, 1 }, { 0, 0 } };
-    final double inputs[][] = new double[][]{{-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
+    final double inputs[][] = {{-1, -1}, {-1, 1}, {1, -1}, {1, 1}};
     // Corresponding outputs, xor training data
-    final double expectedOutputs[][] =  new double[][]{{-1}, {1}, {1}, {-1}};
+    final double expectedOutputs[][] =  {{-1}, {1}, {1}, {-1}};
     //final double expectedOutputs[][] = { { 0 }, { 1 }, { 1 }, { 0 } };
     //double resultOutputs[][] = { { -1 }, { -1 }, { -1 }, { -1 } }; 
     double resultOutputs[][] = { { 0 }, { 0 }, { 0 }, { 0 } }; 
-    double output[];
+    
+    private double[] input = new double[2 + 1];
+    private double[] hidden = new double[4 + 1];
+    private double[] output = new double[1];
+    private int epoch;
+    private double[] deltaOutput = new double[1];
+    private double[] deltaHidden = new double[4];
+    private double[][] weightHtoO = new double[5][1];
+    private double[][] weightItoH = new double[3][4];
+    private double[][] deltaweightItoH = new double[3][4];
+    private double[][] deltaweightHtoO = new double[5][1];
+    private double[] error = new double[1];
+    private double[] err = new double[1];
+    
+   
  
-    // for weight update all
-    final HashMap<String, Double> weightUpdate = new HashMap<String, Double>();
- 
-    public static void main(String[] args) throws IOException {
-        NeuralNetwork nn = new NeuralNetwork(2, 4, 1);
-        int maxRuns = 50000;
-        double minErrorCondition = 0.05;
-        nn.run(maxRuns, minErrorCondition);
+    public NeuralNetwork(double learningRate, double momentum) {        
+		this.learningRate = learningRate;
+        this.momentum = momentum;                
+        epoch = 0;
     }
  
-    public NeuralNetwork(int input, int hidden, int output) {
-        this.layers = new int[] { input, hidden, output };
-        df = new DecimalFormat("#.0#");
- 
-        /**
-         * Create all neurons and connections Connections are created in the
-         * neuron class
-         */
-        for (int i = 0; i < layers.length; i++) {
-            if (i == 0) { // input layer
-                for (int j = 0; j < layers[i]; j++) {
-                    Neuron neuron = new Neuron();
-                    inputLayer.add(neuron);
-                }
-            } else if (i == 1) { // hidden layer
-                for (int j = 0; j < layers[i]; j++) {
-                    Neuron neuron = new Neuron();
-                    neuron.addInConnectionsS(inputLayer);
-                    neuron.addBiasConnection(bias);
-                    hiddenLayer.add(neuron);
-                }
+    // random   
+    public void setWeights() {
+        
+        for(int i = 0; i < 3; i++) {
+            for(int j = 0; j < 4; j++) {
+            	weightItoH[i][j] = Math.random() - 0.5;
             }
- 
-            else if (i == 2) { // output layer
-                for (int j = 0; j < layers[i]; j++) {
-                    Neuron neuron = new Neuron();
-                    neuron.addInConnectionsS(hiddenLayer);
-                    neuron.addBiasConnection(bias);
-                    outputLayer.add(neuron);
-                }
-            } else {
-                System.out.println("Error NeuralNetwork init");
+        }        
+        for(int i = 0; i < 5; i++) {
+            for(int j = 0; j < 1; j++) {
+            	weightHtoO[i][j] = Math.random() - 0.5;
             }
         }
- 
-        // initialize random weights
-        for (Neuron neuron : hiddenLayer) {
-            ArrayList<Connection> connections = neuron.getAllInConnections();
-            for (Connection conn : connections) {
-                double newWeight = getRandom();
-                conn.setWeight(newWeight);
-            
-            }
-        }
-        for (Neuron neuron : outputLayer) {
-            ArrayList<Connection> connections = neuron.getAllInConnections();
-            for (Connection conn : connections) {
-                double newWeight = getRandom();
-                conn.setWeight(newWeight);
-            }
-        }
- 
-        // reset id counters
-        Neuron.counter = 0;
-        Connection.counter = 0;
- 
-       
     }
- 
-    // random
-    double getRandom() {
-    	 
-        return (Math.random() - 0.5); // [-0.5;0.5]
-    }
- 
-    /**
-     * 
-     * @param inputs
-     *            There is equally many neurons in the input layer as there are
-     *            in input variables
-     */
-    public void setInput(double inputs[]) {
-        for (int i = 0; i < inputLayer.size(); i++) {
-            inputLayer.get(i).setOutput(inputs[i]);
-        }
-    }
- 
-    public double[] getOutput() {
-        double[] outputs = new double[outputLayer.size()];
-        for (int i = 0; i < outputLayer.size(); i++)
-            outputs[i] = outputLayer.get(i).getOutput();
-        return outputs;
-    }
- 
+
+    /*public double sigmoid(double x) {
+	//1.0 / (1.0 +  (Math.exp(-x)))
+    return 1 / (1.0 +  (Math.exp(-x)));
+}*/
+    public double sigmoid(double x) {
+		
+	    return (double)(2) / (1 + Math.exp(-x)) -1;
+	}  
+    
     /**
      * Calculate the output of the neural network based on the input The forward
      * operation
      */
-    public void activate() {
-        for (Neuron n : hiddenLayer)
-            n.calculateOutput();
-        for (Neuron n : outputLayer)
-            n.calculateOutput();
+    public void activate(double[] sample) {
+    	
+    	for(int i = 0; i < sample.length; i++) {
+            input[i] = sample[i];
+        }
+    	//Bias
+        input[2] = 1;
+        hidden[4] = 1;                
+    	for(int j = 0; j < 4; j++) {          
+            for(int i = 0; i < 3; i++) {                                    
+            	hidden[j] += (weightItoH[i][j]*input[i]);            	
+            }            
+            hidden[j] = sigmoid(hidden[j]);           
     }
+        for(int k = 0; k < 1; k++) {
+            for(int j = 0; j < 5; j++) {                           
+                output[k] += (weightHtoO[j][k]*hidden[j]);
+            }
+            output[k]= sigmoid(output[k]);
+           
+        }
+    }    
+   
  
     /**
      * all output propagate back
@@ -145,131 +107,99 @@ public class NeuralNetwork {
      *            respect to each of the weight leading into the output neurons
      *            bias is also updated here
      */
-    public void applyBackpropagation(double expectedOutput[]) {
+    public void applyBackpropagation() {
  
-        /* error check, normalize value ]0;1[
-        for (int i = 0; i < expectedOutput.length; i++) {
-            double d = expectedOutput[i];
-            if (d < -1 || d > 1) {
-                if (d < 0)
-                    expectedOutput[i] = -1 + epsilon;
-                else
-                    expectedOutput[i] = 1 - epsilon;
+        
+        
+        for (int k = 0; k < 1; k++) {
+            double ak = output[k];
+            
+            deltaOutput[k] = 0;
+            //deltaOutput[k] = ak * (1 - ak) * (err[k]);         
+            deltaOutput[k] = 0.5 * (1 - Math.pow(ak, 2)) * err[k];
+            
+        }
+        
+        for(int k = 0; k < 1; k++) {
+        
+            for (int j = 0; j < 4 + 1; j++) {
+            	double aj = hidden[j];   
+            	deltaweightHtoO[j][k] = momentum * deltaweightHtoO[j][k]+learningRate * deltaOutput[k]* aj;
+                
+                weightHtoO[j][k] += deltaweightHtoO[j][k];
+                
+                
             }
-        } */
- 
-        int i = 0;
-        for (Neuron n : outputLayer) {
-            ArrayList<Connection> connections = n.getAllInConnections();
-            double ak = n.getOutput();
-            double desiredOutput = expectedOutput[i];
-          //double partialDerivative = ak * (1 - ak) * (desiredOutput - ak);         
-            double partialDerivative = 0.5 * (1 - Math.pow(ak, 2)) * (desiredOutput - ak);
-            for (Connection con : connections) {            
-                double ai = con.leftNeuron.getOutput();                                 
-                double deltaWeight = momentum * con.getPrevDeltaWeight()+learningRate * partialDerivative* ai;
-                double newWeight = con.getWeight() + deltaWeight;
-                con.setDeltaWeight(deltaWeight);
-                con.setWeight(newWeight);
-            }
-            i++;
+            
         }
  
         // update weights for the hidden layer
-        for (Neuron n : hiddenLayer) {
-            ArrayList<Connection> connections = n.getAllInConnections();
-            double aj = n.getOutput();
-            double sumKoutputs = 0;
-            int j = 0;
-            for (Neuron out_neu : outputLayer) {
-                double wjk = out_neu.getConnection(n.id).getWeight();
-                double desiredOutput = (double) expectedOutput[j];
-                double ak = out_neu.getOutput();
-                j++;
-                sumKoutputs += 0.5 * (1 - Math.pow(ak, 2)) * (desiredOutput - ak)*wjk;
-                        //+ ((desiredOutput - ak) * ak * (1 - ak) * wjk);
+
+        for(int j = 0; j < 4; j++) {        
+        	double  aj = hidden[j];
+            deltaHidden[j] = 0;
+            for (int k = 0; k < 1; k++) {
+                
+                deltaHidden[j] += deltaOutput[k]*weightHtoO[j][k];
+                        
             }
-          //double partialDerivative = aj * (1 - aj) * sumKoutputs;
-            double partialDerivative = 0.5* (1 - Math.pow(aj, 2)) * sumKoutputs;
-            for (Connection con : connections) {                
-                double ai = con.leftNeuron.getOutput();               
-                double deltaWeight = momentum * con.getPrevDeltaWeight()+learningRate * partialDerivative* ai;
-                double newWeight = con.getWeight() + deltaWeight;
-                con.setDeltaWeight(deltaWeight);
-                con.setWeight(newWeight);
-            }
+            //deltaHidden[j] = aj * (1 - aj) * deltaHidden[j];
+            deltaHidden[j] = 0.5* (1 - Math.pow(aj, 2)) * deltaHidden[j];          
         }
-    }
- 
-    void run(int maxSteps, double minError)throws IOException {
-        int i;
-        // Train neural network until minError reached or maxSteps exceeded
-        double error = 1;
-        double [] ErrorList = new double[50000];
-        
-        for (i = 0; i < maxSteps && error > minError; i++) {
-            error = 0;
-            for (int p = 0; p < inputs.length; p++) {
-                setInput(inputs[p]);
- 
-                activate();
- 
-                output = getOutput();
-                resultOutputs[p] = output;       
-              
-                double err = Math.pow(output[0] - expectedOutputs[p][0], 2);
-                error += err;
-                
-                applyBackpropagation(expectedOutputs[p]);
+       
+        for(int j = 0; j < 4; j++) {
+            for(int i = 0; i < 2 + 1; i++) {            
+                double ai = input[i];             
+                deltaweightItoH[i][j] = momentum * deltaweightItoH[i][j]+learningRate * deltaHidden[j]* ai;
+                weightItoH[i][j] += deltaweightItoH[i][j];                                               
                 
             }
-            error = error/2;
-            ErrorList[i] = error;
             
         }
-        printResult();
-        File file = new File("chart.txt");
+    }
+    void run(int maxSteps, double minError)throws IOException {       
+        epoch = 0;
+        // Train neural network until minError reached or maxSteps exceeded
+        double [] ErrorList = new double[50000];
+        do {        
+        	for(int k = 0; k < 1; k++) {
+                error[k] = 0;
+            }
+            for (int p = 0; p < inputs.length; p++) {
+                double[] sample = inputs[p];
+ 
+                activate(sample);
+ 
+                for(int k = 0; k < 1; k++) {
+                	err[k] =  expectedOutputs[p][k] - output[k];
+                    error[k] += Math.pow(err[k], 2);
+                    resultOutputs[p] = output;  
+                }
+          
+                applyBackpropagation();                
+            }
+            for(int k = 0; k < 1; k++) {
+	            error[k] /= 2;
+	            
+            }
+            ErrorList[epoch] = error[0];
+            epoch ++;
+        }while(error[0] > minError && epoch <10000);
+        File file = new File("chart4.txt");
 		FileWriter out = new FileWriter(file);
-		for(int q = 0; q<i; q++) {
+		for(int q = 0; q<epoch; q++) {
 			out.write(ErrorList[q]+"\t");
 			out.write("\r\n");
 		}
 		out.close();
-        System.out.println(ErrorList);
-        System.out.println("Sum of squared errors = " + error);
-        System.out.println("##### EPOCH " + i+"\n");
-        if (i == maxSteps) {
+        
+        System.out.println("Sum of squared errors = " + error[0]);
+        System.out.println("##### EPOCH " + epoch+"\n");
+        if (epoch == maxSteps) {
             System.out.println("!Error training try again");
         } 
     }
      
-    void printResult()
-    {
-        System.out.println("NN example with xor training");
-        for (int p = 0; p < inputs.length; p++) {
-            System.out.print("INPUTS: ");
-            for (int x = 0; x < layers[0]; x++) {
-                System.out.print(inputs[p][x] + " ");
-            }
- 
-            System.out.print("EXPECTED: ");
-            for (int x = 0; x < layers[2]; x++) {
-                System.out.print(expectedOutputs[p][x] + " ");
-            }
- 
-            System.out.print("ACTUAL: ");
-            for (int x = 0; x < layers[2]; x++) {
-                System.out.print(resultOutputs[p][x] + " ");
-            }
-            System.out.println();
-        }
-        System.out.println();
-    }
- 
-    String weightKey(int neuronId, int conId) {
-        return "N" + neuronId + "_C" + conId;
-    }
- 
     
     
 }
